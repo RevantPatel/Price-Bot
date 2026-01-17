@@ -1,0 +1,5 @@
+python-telegram-bot
+aiosqlite
+curl_cffi
+python-dotenv
+beautifulsoup4
