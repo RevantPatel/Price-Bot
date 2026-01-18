@@ -3,8 +3,6 @@
 > **Never miss a price drop again.** A high-performance, asynchronous Telegram bot that monitors Amazon products and notifies you instantly when prices fall.
 
 <p align="center">
-  <img src="assets/bot_qr.png" alt="Scan to Chat with Bot" width="200"/>
-  <br>
   <a href="https://t.me/HAWKEYE_PRICEBOT"><strong>Click to Chat with Bot (@HAWKEYE_PRICEBOT)</strong></a>
 </p>
 

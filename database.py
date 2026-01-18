@@ -1,6 +1,8 @@
 import aiosqlite
+import os
 
-DB_FILE = "prices.db"
+# Use env var for DB path (critical for Railway Volumes), default to local file
+DB_FILE = os.getenv("DB_FILE", "prices.db")
 
 async def initialize():
     async with aiosqlite.connect(DB_FILE) as db:
