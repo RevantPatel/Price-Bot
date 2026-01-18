@@ -1,4 +1,4 @@
-python-telegram-bot
+python-telegram-bot[job-queue]
 aiosqlite
 curl_cffi
 python-dotenv
