@@ -24,25 +24,29 @@ def extract_amazon_url(url: str) -> str | None:
     return url if "amazon" in url and "/dp/" in url else None
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message_text = update.message.text.strip()
-    user_id = update.effective_user.id
-    
-    if "amazon" not in message_text and "amzn" not in message_text:
-        await update.message.reply_text("Not an Amazon link.")
-        return
+    try:
+        message_text = update.message.text.strip()
+        user_id = update.effective_user.id
+        
+        if "amazon" not in message_text and "amzn" not in message_text:
+            await update.message.reply_text("Not an Amazon link.")
+            return
 
-    clean_url = extract_amazon_url(message_text) or message_text
-    await update.message.reply_text("Checking price...")
+        clean_url = extract_amazon_url(message_text) or message_text
+        await update.message.reply_text("Checking price...")
 
-    title, price = await asyncio.to_thread(fetch_product_details, clean_url)
+        title, price = await asyncio.to_thread(fetch_product_details, clean_url)
 
-    if title and price:
-        if await add_watch(user_id, clean_url, title, price):
-            await update.message.reply_text(f"Tracking Started!\n{title[:60]}...\nPrice: {price}")
+        if title and price:
+            if await add_watch(user_id, clean_url, title, price):
+                await update.message.reply_text(f"Tracking Started!\n{title[:60]}...\nPrice: {price}")
+            else:
+                await update.message.reply_text("Already tracking this item.")
         else:
-            await update.message.reply_text("Already tracking this item.")
-    else:
-        await update.message.reply_text("Failed to fetch data.")
+            await update.message.reply_text("Failed to fetch data.")
+    except Exception as e:
+        logging.error(f"CRITICAL ERROR in handle_message: {e}", exc_info=True)
+        await update.message.reply_text("An internal error occurred. Please checks logs.")
 
 async def list_watches(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id

@@ -5,6 +5,11 @@ import os
 DB_FILE = os.getenv("DB_FILE", "prices.db")
 
 async def initialize():
+    # Ensure directory exists if DB_FILE is in a subdirectory (like /data/prices.db)
+    db_dir = os.path.dirname(DB_FILE)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS watches (
@@ -73,7 +78,6 @@ async def stream_watches():
 
 async def update_price(watch_id, new_price):
     async with aiosqlite.connect(DB_FILE) as db:
-        # Set previous_price = current_price, and current_price = new_price
         await db.execute(
             "UPDATE watches SET previous_price = current_price, current_price = ? WHERE id = ?",
             (new_price, watch_id)
