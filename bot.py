@@ -73,47 +73,64 @@ async def stop_watch(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Error deleting item.")
 
 async def run_price_check(context: ContextTypes.DEFAULT_TYPE):
-    connection, cursor = await stream_watches()
     try:
-        while True:
-            batch = await cursor.fetchmany(10)
-            if not batch:
-                break
-            
-            tasks = [process_watch_check(context, row) for row in batch]
-            await asyncio.gather(*tasks)
-            await asyncio.sleep(2)
-    finally:
-        await cursor.close()
-        await connection.close()
+        logging.info("Starting background price check job...")
+        connection, cursor = await stream_watches()
+        try:
+            while True:
+                batch = await cursor.fetchmany(10)
+                if not batch:
+                    break
+                
+                tasks = [process_watch_check(context, row) for row in batch]
+                await asyncio.gather(*tasks)
+                await asyncio.sleep(2)
+        finally:
+            await cursor.close()
+            await connection.close()
+    except Exception as e:
+        logging.error(f"CRITICAL ERROR in run_price_check: {e}", exc_info=True)
 
 async def process_watch_check(context, row):
-    watch_id, url, old_price, user_id, title = row
-    _, new_price = await asyncio.to_thread(fetch_product_details, url)
+    try:
+        watch_id, url, old_price, user_id, title = row
+        _, new_price = await asyncio.to_thread(fetch_product_details, url)
 
-    if new_price and new_price != old_price:
-        diff = new_price - old_price
-        emoji = "📉" if diff < 0 else "📈"
-        
-        if diff < 0:
-            msg = f"{emoji} PRICE DROP!\n{title[:50]}...\nOld: {old_price}\nNew: {new_price}\nDiff: {diff:.2f}\n{url}"
-            await context.bot.send_message(chat_id=user_id, text=msg)
-        
-        await update_price(watch_id, new_price)
+        if new_price and new_price != old_price:
+            diff = new_price - old_price
+            emoji = "📉" if diff < 0 else "📈"
+            
+            if diff < 0:
+                msg = f"{emoji} PRICE DROP!\n{title[:50]}...\nOld: {old_price}\nNew: {new_price}\nDiff: {diff:.2f}\n{url}"
+                await context.bot.send_message(chat_id=user_id, text=msg)
+            
+            await update_price(watch_id, new_price)
+    except Exception as e:
+        logging.error(f"Error processing watch {row[0]}: {e}")
 
 if __name__ == '__main__':
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(initialize())
-
+    logging.info("Initializing Bot...")
+    
+    # Check for token explicitly and log error if missing
     if not TELEGRAM_TOKEN:
+        logging.critical("TELEGRAM_TOKEN is missing! Please set it in Railway Variables.")
         exit(1)
 
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(CommandHandler("list", list_watches))
-    app.add_handler(MessageHandler(filters.Regex(r"^/stop_(\d+)$"), stop_watch))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(initialize())
+        logging.info("Database initialized.")
 
-    app.job_queue.run_repeating(run_price_check, interval=1800, first=10)
-    app.run_polling()
+        app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+        app.add_handler(CommandHandler("start", start_command))
+        app.add_handler(CommandHandler("list", list_watches))
+        app.add_handler(MessageHandler(filters.Regex(r"^/stop_(\d+)$"), stop_watch))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+        app.job_queue.run_repeating(run_price_check, interval=1800, first=10)
+        
+        logging.info("Bot is starting polling...")
+        app.run_polling()
+    except Exception as e:
+        logging.critical(f"Bot execution failed: {e}", exc_info=True)
